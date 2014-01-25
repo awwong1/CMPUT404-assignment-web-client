@@ -32,6 +32,9 @@ class HTTPRequest(object):
     def __init__(self, code=200, body=""):
         self.code = code
         self.body = body
+    
+    def __str__(self):
+        return str(self.code) + '\n\r' + self.body
 
 class HTTPClient(object):
     #def get_host_port(self,url):
@@ -121,5 +124,6 @@ if __name__ == "__main__":
         sys.exit(1)
     elif (len(sys.argv) == 3):
         print client.command( sys.argv[2], sys.argv[1] )
+        
     else:
-        print client.command( sys.argv[1], command )    
+        print client.command( sys.argv[1], command )
