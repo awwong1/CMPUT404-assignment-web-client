@@ -23,6 +23,7 @@ import socket
 import re
 # you may use urllib to encode data appropriately
 import urllib
+import urlparse
 
 def help():
     print "httpclient.py [GET/POST] [URL]\n"
@@ -40,34 +41,70 @@ class HTTPClient(object):
         return None
 
     def get_code(self, data):
-        return None
-
+        return int(data.split()[1])
+        
     def get_headers(self,data):
-        return None
+        counter = 0
+        data = data.splitlines()
+        for i in data:
+            counter += 1
+            if i == "":
+                break
+        return "\r\n".join(data[0:counter-1])
 
     def get_body(self, data):
-        return None
+        counter = 0
+        data = data.splitlines()
+        for i in data:
+            counter += 1
+            if i == "":
+                break
+        return "\r\n".join(data[counter:len(data)])
 
     # read everything from the socket
-    def recvall(self, sock):
-        buffer = bytearray()
-        done = False
-        while not done:
-            part = sock.recv(1024)
-            if (part):
-                buffer.extend(part)
-            else:
-                done = not part
-        return str(buffer)
+    def recvall(self, sock, buffersize=4096):
+        response = [sock.recv(buffersize)]
+        while response[-1]:
+            response.append(sock.recv(buffersize))
+        return ''.join(response) 
+
+    def path_host_port(self, url):
+        parsed = urlparse.urlparse(url)
+        try:
+            host, port = parsed.netloc.split(':')
+        except ValueError:
+            host, port = parsed.netloc, 80
+        return [parsed, host, port]
+    
+    def setup_socket(self, sockvals, timeout=10):
+        sock = socket.create_connection((sockvals[1], sockvals[2]), timeout)
+        return sock
 
     def GET(self, url, args=None):
-        code = 500
-        body = ""
-        return HTTPRequest(code, body)
+        sockvals = self.path_host_port(url)
+        sock = self.setup_socket(sockvals)
+        sock.sendall('GET %s HTTP/1.0\n\n' % sockvals[0].geturl())
+        data = self.recvall(sock)
+        code = self.get_code(data)
+        body = self.get_body(data)
+        return HTTPRequest(code, body)        
 
     def POST(self, url, args=None):
-        code = 500
-        body = ""
+        sockvals = self.path_host_port(url)
+        sock = self.setup_socket(sockvals)
+        
+        postsock = 'POST %s HTTP/1.0\n' % sockvals[0].geturl()
+        if args != None:
+            postdata = urllib.urlencode(args)
+            postsock += ('Content-Length: '+ 
+                         str(len(postdata))+'\n\n'+
+                         postdata)
+        else:
+            postsock += "\n"
+        sock.sendall(postsock)
+        data = self.recvall(sock)
+        code = self.get_code(data)
+        body = self.get_body(data)
         return HTTPRequest(code, body)
 
     def command(self, url, command="GET", args=None):
@@ -83,6 +120,6 @@ if __name__ == "__main__":
         help()
         sys.exit(1)
     elif (len(sys.argv) == 3):
-        print client.command( sys.argv[1], sys.argv[2] )
+        print client.command( sys.argv[2], sys.argv[1] )
     else:
-        print client.command( command, sys.argv[1] )    
+        print client.command( sys.argv[1], command )    
